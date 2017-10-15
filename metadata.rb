@@ -801,6 +801,10 @@ attribute "hops/rm/private_ips",
           :description => "Set ip addresses",
           :type => "array"
 
+attribute "hops/rm/public_ips",
+          :description => "Set ip addresses",
+          :type => "array"
+
 # Needed to find the jar file for yan-spark-shuffle
 attribute "hadoop_spark/version",
           :description => "Spark version",
@@ -946,6 +950,10 @@ attribute "hops/rpc/ssl",
 ##
 ##
 attribute "kkafka/default/private_ips",
+          :description => "Set ip addresses",
+          :type => "array"
+
+attribute "kkafka/default/public_ips",
           :description => "Set ip addresses",
           :type => "array"
 
@@ -1276,6 +1284,10 @@ attribute "elastic/checksum",
 ##
 
 attribute "kzookeeper/default/private_ips",
+          :description => "Set ip addresses",
+          :type => "array"
+
+attribute "kzookeeper/default/public_ips",
           :description => "Set ip addresses",
           :type => "array"
 
