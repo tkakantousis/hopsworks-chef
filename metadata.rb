@@ -4,7 +4,7 @@ maintainer_email "jdowling@kth.se"
 license          "Apache v2.0"
 description      "Installs/Configures HopsWorks, the UI for Hops Hadoop."
 long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
-version          "0.3.0"
+version          "0.5.0"
 source_url       "https://github.com/hopshadoop/hopsworks-chef"
 
 
@@ -132,9 +132,21 @@ attribute "hopsworks/domains_dir",
           :description => "Installation directory for the glassfish domains",
           :type => 'string'
 
+attribute "hopsworks/domain_truststore",
+          :description => "Name of the glassfish truststore for this domain.",
+          :type => 'string'
+
+attribute "hopsworks/domain_truststore_path",
+          :description => "Path where domain_truststore is stored",
+          :type => 'string'
+
 attribute "hopsworks/master/password",
           :description => "Web Application Server master password",
           :type => 'string'
+
+#attribute "hopsworks/http_secure_enabled",
+#          :description => "Indicates if there is an HTTPS listener enabled",
+#          :type => 'string'
 
 attribute "download_url",
           :description => "URL for downloading binaries",
@@ -182,6 +194,10 @@ attribute "glassfish/group",
 
 attribute "hopsworks/port",
           :description => "Port that webserver will listen on",
+          :type => 'string'
+
+attribute "hopsworks/secure_port",
+          :description => "TLS Port that webserver will listen on",
           :type => 'string'
 
 attribute "hopsworks/max_mem",
@@ -747,7 +763,11 @@ attribute "hops/use_systemd",
           :type => "string"
 
 attribute "hops/format",
-          :description => "Format HDFS",
+          :description => "'true' to format HDFS, 'false' to skip formatting",
+          :type => 'string'
+
+attribute "hops/reformat",
+          :description => "'true' to re-format HDFS, 'false' to skip re-formatting",
           :type => 'string'
 
 attribute "hops/nm/log_dir",
@@ -1549,6 +1569,22 @@ attribute "ndb/group",
 
 attribute "ndb/BackupDataDir",
           :description => "Directory to store mysql cluster backups in",
+          :type => 'string'
+
+attribute "ndb/remote_backup_host",
+          :description => "Hostname of the machine where the backups will be stored",
+          :type => 'string'
+
+attribute "ndb/remote_backup_user",
+          :description => "User on the remote backup machine. SSH access should be configured",
+          :type => 'string'
+
+attribute "ndb/remote_backup_dir",
+          :description => "Directory on the remote backup machine that the archives will be stored",
+          :type => 'string'
+
+attribute "ndb/local_backup_dir",
+          :description => "Directory on the local MGM machine where backups will temporarily be stored",
           :type => 'string'
 
 attribute "mysql/user",
