@@ -10,7 +10,7 @@ cookbook 'hops', github: "tkakantousis/hops-hadoop-chef", branch: "HOPSWORKS-540
 cookbook 'ndb', github: "hopshadoop/ndb-chef", branch: "master"
 cookbook 'hadoop_spark', github: "hopshadoop/spark-chef", branch: "HOPSWORKS-481"
 cookbook 'flink', github: "hopshadoop/flink-chef", branch: "master"
-cookbook 'zeppelin', github: "hopshadoop/zeppelin-chef", branch: "master"
+cookbook 'zeppelin', github: "tkakantousis/zeppelin-chef", branch: "HOPSWORKS-481"
 cookbook 'livy', github: "tkakantousis/livy-chef", branch: "HOPSWORKS-481"
 cookbook 'drelephant', github: "hopshadoop/dr-elephant-chef", branch: "master"
 cookbook 'tensorflow', github: "hopshadoop/tensorflow-chef", branch: "master"
