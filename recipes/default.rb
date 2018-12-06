@@ -1,3 +1,4 @@
+include_recipe "java"
 
 domain_name= node['hopsworks']['domain_name']
 domains_dir = node['hopsworks']['domains_dir']
@@ -10,21 +11,6 @@ if node['hopsworks']['dela']['enabled'] == "true"
     end
   end
 end
-
-case node['platform']
-when "ubuntu"
- if node['platform_version'].to_f <= 14.04
-   node.override['hopsworks']['systemd'] = "false"
- end
-end
-
-if node['hopsworks']['systemd'] === "true"
-  systemd = true
-else
-  systemd = false
-end
-
-include_recipe "java"
 
 # If the install.rb recipe was in a different run, the location of the install dir may
 # not be correct. install_dir is updated by install.rb, but not persisted, so we need to
@@ -51,7 +37,6 @@ rescue
   hopsworks_ip = ""
   Chef::Log.warn "could not find the hopsworks server ip for HopsWorks!"
 end
-
 
 begin
   spark_history_server_ip = private_recipe_ip("hadoop_spark","historyserver")
@@ -311,7 +296,7 @@ for version in versions do
          :yarn_ui_ip => public_recipe_ip("hops","rm"),
          :hdfs_ui_ip => public_recipe_ip("hops","nn"),
          :hdfs_ui_port => hdfs_ui_port,
-         :hopsworks_dir => domains_dir,
+         :hopsworks_dir => theDomain,
          :hops_rpc_tls => hops_rpc_tls_val,
          :yarn_default_quota => node['hopsworks']['yarn_default_quota_mins'].to_i * 60,
          :hdfs_default_quota => node['hopsworks']['hdfs_default_quota_mbs'].to_i,
@@ -331,7 +316,8 @@ for version in versions do
          :hiveext_hostname => hiveserver_ip + ":#{node['hive2']['port']}",
          :nonconda_hosts_list => nonconda_hosts_list,
          :featurestore_default_storage_format => node['hopsworks']['featurestore_default_storage_format'],
-         :tf_spark_connector_version => node['hadoop_spark']['tf_spark_connector_version']
+         :tf_spark_connector_version => node['hadoop_spark']['tf_spark_connector_version'],
+         :service_jwt = get_service_jwt()
     })
     action :create
   end
@@ -665,6 +651,23 @@ glassfish_asadmin "create-managed-executor-service --enabled=true --longrunningt
    admin_port admin_port
    secure false
   not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-managed-executor-services | grep 'kagent'"
+end
+
+# Http listeners configuration
+glassfish_asadmin "set server.network-config.protocols.protocol.http-listener-2.ssl.ssl-inactivity-timeout=#{node['glassfish']['http']['keep_alive_timeout']}" do
+   domain_name domain_name
+   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+   username username
+   admin_port admin_port
+   secure false
+end
+
+glassfish_asadmin "set server.network-config.protocols.protocol.http-listener-1.http.timeout-seconds=#{node['glassfish']['http']['keep_alive_timeout']}" do
+   domain_name domain_name
+   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+   username username
+   admin_port admin_port
+   secure false
 end
 
 if node['ldap']['enabled'].eql? "true"
