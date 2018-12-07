@@ -2252,11 +2252,6 @@ attribute "hopsworks/jwt/signing_key_name",
           :description => "Default signing key name. (default apiKey)",
           :type => 'string'
 
-# Fabio remove this before merging
-attribute "install/current_version",
-          :description => "Current installed Hopsworks version",
-          :type => "string"
-
 ### Feature Store
 attribute "hopsworks/featurestore_default_storage_format",
           :description => "Default storage format for the hive database of the feature stores (ORC/PARQUET)",
