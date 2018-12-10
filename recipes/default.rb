@@ -317,7 +317,8 @@ for version in versions do
          :nonconda_hosts_list => nonconda_hosts_list,
          :featurestore_default_storage_format => node['hopsworks']['featurestore_default_storage_format'],
          :tf_spark_connector_version => node['hadoop_spark']['tf_spark_connector_version'],
-         :service_jwt = get_service_jwt()
+         :service_jwt = get_service_jwt(),
+         :nonconda_hosts_list => nonconda_hosts_list
     })
     action :create
   end
@@ -654,7 +655,7 @@ glassfish_asadmin "create-managed-executor-service --enabled=true --longrunningt
 end
 
 # Http listeners configuration
-glassfish_asadmin "set server.network-config.protocols.protocol.http-listener-2.ssl.ssl-inactivity-timeout=#{node['glassfish']['http']['keep_alive_timeout']}" do
+glassfish_asadmin "set server.network-config.protocols.protocol.http-listener-2.http.timeout-seconds=#{node['glassfish']['http']['keep_alive_timeout']}" do
    domain_name domain_name
    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
    username username
@@ -1044,6 +1045,16 @@ kagent_keys "#{homedir}" do
   action :return_publickey
 end
 
+# Generate a service JWT token to be used internally in Hopsworks
+bash "generate_jwt" do
+  user "root"
+  environment (lazy {{'JWT' => get_service_jwt()}})
+  code <<-EOH
+    #{node['ndb']['scripts_dir']}/mysql-client.sh -e "REPLACE INTO hopsworks.variables(id, value) VALUE ('service_jwt', '$JWT');"
+  EOH
+end
+
+# Force variables reload
 hopsworks_grants "restart_glassfish" do
   action :reload_systemd
 end
