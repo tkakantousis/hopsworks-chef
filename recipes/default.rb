@@ -317,7 +317,6 @@ for version in versions do
          :nonconda_hosts_list => nonconda_hosts_list,
          :featurestore_default_storage_format => node['hopsworks']['featurestore_default_storage_format'],
          :tf_spark_connector_version => node['hadoop_spark']['tf_spark_connector_version'],
-         :service_jwt = get_service_jwt(),
          :nonconda_hosts_list => nonconda_hosts_list
     })
     action :create
