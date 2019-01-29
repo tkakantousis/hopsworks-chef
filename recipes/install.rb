@@ -316,6 +316,26 @@ node.override = {
               }
             }
           },
+          'airflowPool' => {
+            'config' => {
+              'datasourceclassname' => 'com.mysql.jdbc.jdbc2.optional.MysqlDataSource',
+              'restype' => 'javax.sql.DataSource',
+              'isconnectvalidatereq' => 'true',
+              'validationmethod' => 'auto-commit',
+              'ping' => 'true',
+              'description' => 'Airflow Connection Pool',
+              'properties' => {
+                'Url' => "jdbc:mysql://#{my_ip}:3306/",
+                'User' => mysql_user,
+                'Password' => mysql_password
+              }
+            },
+            'resources' => {
+              'jdbc/airflow' => {
+                'description' => 'Resource for Airflow Pool',
+              }
+            }
+          },
           'ejbTimerPool' => {
             'config' => {
               'datasourceclassname' => 'com.mysql.jdbc.jdbc2.optional.MysqlDataSource',
