@@ -326,8 +326,8 @@ node.override = {
               'description' => 'Airflow Connection Pool',
               'properties' => {
                 'Url' => "jdbc:mysql://#{my_ip}:3306/",
-                'User' => mysql_user,
-                'Password' => mysql_password
+                'User' => node['hops_airflow']['mysql_user'],
+                'Password' => node['hops_airflow']['mysql_password']
               }
             },
             'resources' => {
