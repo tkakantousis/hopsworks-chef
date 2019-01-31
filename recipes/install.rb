@@ -221,17 +221,6 @@ file "#{node['hopsworks']['env_var_file']}" do
 end
 
 
-airflow_mysql_user = "airflow_db"
-airflow_mysql_password = "airflow_db"
-if node.attribute?("hops_airflow")
-  if node["hops_airflow"].attribute?("mysql_user")
-    airflow_db_user = node["hops_airflow"]["mysql_user"]
-  end
-  if node["hops_airflow"].attribute?("mysql_password")
-    airflow_db_password = node["hops_airflow"]["mysql_password"]
-  end
-end
-
 node.override = {
   'java' => {
     'install_flavor' => node['java']['install_flavor'],
@@ -338,8 +327,8 @@ node.override = {
               'description' => 'Airflow Connection Pool',
               'properties' => {
                 'Url' => "jdbc:mysql://#{my_ip}:3306/",
-                'User' => airflow_mysql_user,
-                'Password' => airflow_mysql_password
+                'User' => node['airflow']['mysql_user'],
+                'Password' => node['airflow']['mysql_password']
               }
             },
             'resources' => {
