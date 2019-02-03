@@ -279,6 +279,10 @@ attribute "hopsworks/file_preview_txt_size",
           :description => "Maximum size in lines of file that can be previewed in DataSets",
           :type => 'string'
 
+attribute "hopsworks/download_allowed",
+          :description => "Whether users should be allowed to download files from datasets. Default value is true.",
+          :type => 'string'
+
 attribute "hopsworks/anaconda_enabled",
           :description => "Default is 'true'. Set to 'false' to disable anaconda.",
           :type => 'string'
@@ -1422,9 +1426,17 @@ attribute "zeppelin/dir",
 
 ##
 ##
-## Presto
+## TFServing
 ##
 ##
+
+attribute "tfserving/pool_size",
+          :description => "size of the connection pool for serving inference requests",
+          :type => 'string'
+
+attribute "tfserving/max_route_connections",
+          :description => "max number of connections to serve requests to a unique route",
+          :type => 'string'
 
 ##
 ##
@@ -2255,6 +2267,10 @@ attribute "hopsworks/jwt/exp_leeway_sec",
 
 attribute "hopsworks/jwt/signing_key_name",
           :description => "Default signing key name. (default apiKey)",
+          :type => 'string'
+
+attribute "hopsworks/jwt/issuer",
+          :description => "JWT issuer identifier. (default hopsworks@logicalclocks.com)",
           :type => 'string'
 
 # Fabio remove this before merging
