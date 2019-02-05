@@ -1,8 +1,15 @@
 
-domain_name="domain1"
+domain_name= node['hopsworks']['domain_name']
 domains_dir = node['hopsworks']['domains_dir']
 theDomain="#{domains_dir}/#{domain_name}"
 
+if node['hopsworks']['dela']['enabled'] == "true"
+  if node['hopssite']['manual_register'].empty? || node['hopssite']['manual_register'] == "false"
+    hopsworks_certs "sign-ca-with-root-hopssite-ca" do
+      action :sign_hopssite
+    end
+  end
+end
 
 case node['platform']
 when "ubuntu"
@@ -17,12 +24,7 @@ else
   systemd = false
 end
 
-
 include_recipe "java"
-
-##
-## default['rb']
-##
 
 # If the install.rb recipe was in a different run, the location of the install dir may
 # not be correct. install_dir is updated by install.rb, but not persisted, so we need to
@@ -166,48 +168,16 @@ rescue
 end
 
 
-vagrant_enabled = 0
-if node['hopsworks']['user'] == "vagrant"
-  vagrant_enabled = 1
-end
 
-tables_path = "#{domains_dir}/tables.sql"
-views_path = "#{domains_dir}/views.sql"
-rows_path = "#{domains_dir}/rows.sql"
+db="hopsworks"
+exec = "#{node['ndb']['scripts_dir']}/mysql-client.sh"
 
-hopsworks_grants "hopsworks_tables" do
-  tables_path  "#{tables_path}"
-  views_path  "#{views_path}"
-  rows_path  "#{rows_path}"
-  action :nothing
-end
-
-template views_path do
-  source File.basename("#{views_path}") + ".erb"
-  owner node['glassfish']['user']
-  mode 0750
-  action :create
-  variables({
-               :private_ip => private_ip
-              })
-end
-
-# Need to delete the sql file so that the action is triggered
-file tables_path do
-  action :delete
-  ignore_failure true
-end
-
-Chef::Log.info("Could not find previously defined #{tables_path} resource")
-template tables_path do
-  source File.basename("#{tables_path}") + ".erb"
-  owner node['glassfish']['user']
-  mode 0750
-  action :create
-  variables({
-                :private_ip => private_ip
-              })
-    notifies :create_tables, 'hopsworks_grants[hopsworks_tables]', :immediately
+bash 'create_hopsworks_db' do
+  user "root"
+  code <<-EOF
+      set -e
+      #{exec} -e \"CREATE DATABASE IF NOT EXISTS hopsworks CHARACTER SET latin1\"
+    EOF
 end
 
 timerTable = "ejbtimer_mysql.sql"
@@ -259,104 +229,156 @@ if h.length > 0
 end
 
 hops_rpc_tls_val = "false"
-if node['hops']['rpc']['ssl'].eql? "true"
+if node['hops']['tls']['enabled'].eql? "true"
   hops_rpc_tls_val = "true"
 end
 
 hdfs_ui_port = node['hops']['nn']['http_port']
-if node['hops']['rpc']['ssl'].eql? "true"
+if node['hops']['tls']['enabled'].eql? "true"
   hdfs_ui_port = node['hops']['dfs']['https']['port']
 end
 
-template "#{rows_path}" do
-   source File.basename("#{rows_path}") + ".erb"
-   owner node['glassfish']['user']
-   mode 0755
-   action :create
-    variables({
-                :hosts => hosts,
-                :epipe_ip => epipe_ip,
-                :livy_ip => livy_ip,
-                :jhs_ip => jhs_ip,
-                :rm_ip => rm_ip,
-                :rm_port => rm_port,
-                :logstash_ip => logstash_ip,
-                :logstash_port => logstash_port,
-                :spark_history_server_ip => spark_history_server_ip,
-                :hopsworks_ip => hopsworks_ip,
-                :elastic_ip => elastic_ip,
-                :spark_dir => node['hadoop_spark']['dir'] + "/spark",
-                :spark_user => node['hadoop_spark']['user'],
-                :hadoop_dir => node['hops']['dir'] + "/hadoop",
-                :yarn_user => node['hops']['yarn']['user'],
-                :yarn_ui_ip => public_recipe_ip("hops","rm"),
-                :yarn_ui_port => node['hops']['rm']['http_port'],
-                :hdfs_ui_ip => public_recipe_ip("hops","nn"),
-                :hdfs_ui_port => hdfs_ui_port,
-                :hopsworks_user => node['hopsworks']['user'],
-                :hdfs_user => node['hops']['hdfs']['user'],
-                :mr_user => node['hops']['mr']['user'],
-                :flink_dir => node['flink']['dir'] + "/flink",
-                :flink_user => node['flink']['user'],
-                :zeppelin_dir => node['zeppelin']['dir'] + "/zeppelin",
-                :zeppelin_user => node['zeppelin']['user'],
-                :ndb_dir => node['ndb']['dir'] + "/mysql-cluster",
-                :mysql_dir => node['mysql']['dir'] + "/mysql",
-                :elastic_dir => node['elastic']['dir'] + "/elastic",
-                :hopsworks_dir => domains_dir,
-                :twofactor_auth => node['hopsworks']['twofactor_auth'],
-                :twofactor_exclude_groups => node['hopsworks']['twofactor_exclude_groups'],
-                :hops_rpc_tls => hops_rpc_tls_val,
-                :cert_mater_delay => node['hopsworks']['cert_mater_delay'],
-                :elastic_user => node['elastic']['user'],
-                :yarn_default_quota => node['hopsworks']['yarn_default_quota_mins'].to_i * 60,
-                :hdfs_default_quota => node['hopsworks']['hdfs_default_quota_mbs'].to_i,
-                :hive_default_quota => node['hopsworks']['hive_default_quota_mbs'].to_i,
-                :max_num_proj_per_user => node['hopsworks']['max_num_proj_per_user'],
-		:file_preview_image_size => node['hopsworks']['file_preview_image_size'],
-		:file_preview_txt_size => node['hopsworks']['file_preview_txt_size'],
-                :zk_ip => zk_ip,
-                :java_home => node['java']['java_home'],
-                :kafka_ip => kafka_ip,
-                :kafka_num_replicas => node['hopsworks']['kafka_num_replicas'],
-                :kafka_num_partitions => node['hopsworks']['kafka_num_partitions'],
-                :drelephant_port => node['drelephant']['port'],
-                :drelephant_db => node['drelephant']['db'],
-                :drelephant_ip => drelephant_ip,
-                :kafka_user => node['kkafka']['user'],
-                :kibana_ip => kibana_ip,
-                :python_kernel => python_kernel,
-                :grafana_ip => grafana_ip,
-                :influxdb_ip => influxdb_ip,
-                :influxdb_port => node['influxdb']['http']['port'],
-                :influxdb_user => node['influxdb']['db_user'],
-                :influxdb_password => node['influxdb']['db_password'],
-                :graphite_port => node['influxdb']['graphite']['port'],
-                :cuda_dir => node['cuda']['base_dir'],
-                :anaconda_dir => node['conda']['base_dir'],
-                :org_name => node['hopsworks']['org_name'],
-                :org_domain => node['hopsworks']['org_domain'],
-                :org_email => node['hopsworks']['org_email'],
-                :org_country_code => node['hopsworks']['org_country_code'],
-                :org_city => node['hopsworks']['org_city'],
-                :vagrant_enabled => vagrant_enabled,
-                :public_ip => public_ip,
-                :monitor_max_status_poll_try => node['hopsworks']['monitor_max_status_poll_try'],
-                :dela_enabled => node['hopsworks']['dela']['enabled'],
-                :dela_ip => dela_ip,
-                :dela_port => node['dela']['http_port'],
-                :dela_cluster_http_port => node['hopsworks']['dela']['cluster_http_port'],
-                :dela_hopsworks_public_port => node['hopsworks']['dela']['public_hopsworks_port'],
-                :recovery_path => node['hopsworks']['recovery_path'],
-                :verification_path => node['hopsworks']['verification_path'],
-                :hivessl_hostname => hiveserver_ip + ":#{node['hive2']['portssl']}",
-                :hiveext_hostname => hiveserver_ip + ":#{node['hive2']['port']}",
-                :hive_warehouse => "#{node['hive2']['hopsfs_dir']}/warehouse",
-                :hive_scratchdir => node['hive2']['scratch_dir']
-           })
-   notifies :insert_rows, 'hopsworks_grants[hopsworks_tables]', :immediately
+condaRepo = 'defaults'
+if node['conda']['mirror_list'].empty? == false
+   repos = node['conda']['mirror_list'].split(/\s*,\s*/)
+   condaRepo = repos[0]
 end
 
+nonconda_hosts_list = []
+if node['hopsworks']['nonconda_hosts'].empty? == false
+  nonconda_hosts_list = node['hopsworks']['nonconda_hosts'].split(/\s*,\s*/)
+end
+
+# Hive metastore should be created before the hopsworks tables are created
+# Hopsworks 0.8.0 introduce tables with foreign keys to Hive metastore (feature store service)
+include_recipe "hive2::db"
+
+versions = node['hopsworks']['versions'].split(/\s*,\s*/)
+target_version = node['hopsworks']['version'].sub("-SNAPSHOT", "")
+versions.push(target_version)
+current_version = node['hopsworks']['current_version']
+
+if current_version.eql?("")
+  # New installation -> template the current version schema file
+  cookbook_file "#{theDomain}/flyway/sql/V#{target_version}__initial_tables.sql" do
+    source "sql/ddl/#{target_version}__initial_tables.sql"
+    owner node['glassfish']['user']
+    mode 0750
+    action :create
+  end
+else
+  current_version_idx = versions.index(current_version).to_i
+  versions_length = versions.length.to_i - 1
+
+  for i in current_version_idx..versions_length
+    # Update, template all the dml files from the current version to the target version
+    cookbook_file "#{theDomain}/flyway/sql/V#{versions[i]}__hopsworks.sql" do
+      source "sql/ddl/updates/#{versions[i]}.sql"
+      owner node['glassfish']['user']
+      mode 0750
+      action :create
+    end
+
+    cookbook_file "#{theDomain}/flyway/undo/U#{versions[i]}__undo.sql" do
+      source "sql/ddl/updates/undo/#{versions[i]}__undo.sql"
+      owner node['glassfish']['user']
+      mode 0750
+      action :create
+    end
+  end
+end
+
+for version in versions do
+  # Template DML files
+  template "#{theDomain}/flyway/dml/V#{version}__hopsworks.sql" do
+    source "sql/dml/#{version}.sql.erb"
+    owner node['glassfish']['user']
+    mode 0750
+    variables({
+         :user_cert_valid_days => node['hopsworks']['cert']['user_cert_valid_days'],
+         :conda_repo => condaRepo,
+         :hosts => hosts,
+         :epipe_ip => epipe_ip,
+         :livy_ip => livy_ip,
+         :jhs_ip => jhs_ip,
+         :rm_ip => rm_ip,
+         :rm_port => rm_port,
+         :logstash_ip => logstash_ip,
+         :logstash_port => logstash_port,
+         :spark_history_server_ip => spark_history_server_ip,
+         :hopsworks_ip => hopsworks_ip,
+         :elastic_ip => elastic_ip,
+         :yarn_ui_ip => public_recipe_ip("hops","rm"),
+         :hdfs_ui_ip => public_recipe_ip("hops","nn"),
+         :hdfs_ui_port => hdfs_ui_port,
+         :hopsworks_dir => domains_dir,
+         :hops_rpc_tls => hops_rpc_tls_val,
+         :yarn_default_quota => node['hopsworks']['yarn_default_quota_mins'].to_i * 60,
+         :hdfs_default_quota => node['hopsworks']['hdfs_default_quota_mbs'].to_i,
+         :hive_default_quota => node['hopsworks']['hive_default_quota_mbs'].to_i,
+         :featurestore_default_quota => node['hopsworks']['featurestore_default_quota_mbs'].to_i,
+         :zk_ip => zk_ip,
+         :java_home => node['java']['java_home'],
+         :drelephant_ip => drelephant_ip,
+         :kafka_ip => kafka_ip,
+         :kibana_ip => kibana_ip,
+         :python_kernel => python_kernel,
+         :grafana_ip => grafana_ip,
+         :influxdb_ip => influxdb_ip,
+         :public_ip => public_ip,
+         :dela_ip => dela_ip,
+         :hivessl_hostname => hiveserver_ip + ":#{node['hive2']['portssl']}",
+         :hiveext_hostname => hiveserver_ip + ":#{node['hive2']['port']}",
+         :nonconda_hosts_list => nonconda_hosts_list,
+         :featurestore_default_storage_format => node['hopsworks']['featurestore_default_storage_format'],
+         :tf_spark_connector_version => node['hadoop_spark']['tf_spark_connector_version']
+    })
+    action :create
+  end
+
+  template "#{theDomain}/flyway/dml/undo/U#{version}__undo.sql" do
+    source "sql/dml/undo/#{version}__undo.sql.erb"
+    owner node['glassfish']['user']
+    mode 0750
+    action :create
+  end
+end
+
+if !current_version.eql?("") && current_version < "0.6.0"
+ cookbook_file "#{theDomain}/flyway/sql/flyway_schema_history_0.6.0.sql" do
+  source "sql/flyway_schema_history_0.6.0.sql"
+  owner node['glassfish']['user']
+  mode 0750
+  action :create
+ end
+
+ # Re-create the table only if it already exists
+ bash "mod_flyway_history_0.6.0" do
+  user "root"
+  code <<-EOH
+    #{node['ndb']['scripts_dir']}/mysql-client.sh hopsworks < #{theDomain}/flyway/sql/flyway_schema_history_0.6.0.sql
+  EOH
+  only_if "#{node['ndb']['scripts_dir']}/mysql-client.sh hopsworks -e \"select version from flyway_schema_history where script like 'V%' order by installed_on desc\" | grep -v \"0.6.0\""
+ end
+end
+
+bash "flyway_migrate" do
+  user "root"
+  cwd "#{theDomain}/flyway"
+  code <<-EOF
+    #{theDomain}/flyway/flyway migrate
+  EOF
+end
+
+# Run the DML sql script to insert the variables
+for version in versions do
+  bash "run_inserts_#{version}" do
+    user "root"
+    code <<-EOH
+      #{node['ndb']['scripts_dir']}/mysql-client.sh hopsworks < #{theDomain}/flyway/dml/V#{version}__hopsworks.sql
+    EOH
+  end
+end
 
 
 ###############################################################################
@@ -403,13 +425,24 @@ template "#{log4j_cnf}" do
   group node['glassfish']['group']
 end
 
-
-hopsworks_grants "reload_sysv" do
- tables_path  ""
- rows_path  ""
- action :reload_sysv
+# Add Hadoop glob classpath to Glassfish
+# systemd unit environment variables file
+hadoop_glob_command = "#{node['hops']['bin_dir']}/hadoop classpath --glob"
+ruby_block "export_hadoop_classpath" do
+  block do
+    Chef::Resource::RubyBlock.send(:include, Chef::Mixin::ShellOut)
+    exec_stdout = shell_out(hadoop_glob_command).stdout
+    variable = "HADOOP_GLOB=#{exec_stdout}"
+    file = Chef::Util::FileEdit.new(node['hopsworks']['env_var_file'])
+    file.insert_line_if_no_match(/#{variable}/, variable)
+    file.write_file
+  end
+  action :create
 end
 
+hopsworks_grants "restart_glassfish" do
+  action :reload_systemd
+end
 
 glassfish_secure_admin domain_name do
   domain_name domain_name
@@ -419,11 +452,6 @@ glassfish_secure_admin domain_name do
   secure false
   action :enable
 end
-
-
-#end
-
-
 
 props =  {
   'datasource-jndi' => jndiDB,
@@ -476,7 +504,7 @@ props =  {
    username username
    admin_port admin_port
    secure false
-   classname "se.kth.bbc.crealm.CustomAuthRealm"
+   classname "io.hops.crealm.CustomAuthRealm"
  end
 
 
@@ -524,24 +552,6 @@ glassfish_asadmin "set server.network-config.protocols.protocol.sec-admin-listen
    secure false
 end
 
-# Disable SSLv3 on iiop-listener.ssl
-#glassfish_asadmin "set server.iiop-service.iiop-listener.SSL.ssl.ssl3-enabled=false" do
-#   domain_name domain_name
-#   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#   username username
-#   admin_port admin_port
-#   secure false
-#end
-
-# Disable SSLv3 on iiop-muth_listener.ssl
-#glassfish_asadmin "set server.iiop-service.iiop-listener.SSL_MUTUALAUTH.ssl.ssl3-enabled=false" do
-#   domain_name domain_name
-#   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#   username username
-#   admin_port admin_port
-#   secure false
-#end
-
 # Restrict ciphersuite
 glassfish_asadmin "set configs.config.server-config.network-config.protocols.protocol.http-listener-2.ssl.ssl3-tls-ciphers=#{node['glassfish']['ciphersuite']}" do
    domain_name domain_name
@@ -559,16 +569,6 @@ glassfish_asadmin "set configs.config.server-config.network-config.protocols.pro
    admin_port admin_port
    secure false
 end
-
-# Restrict ciphersuite
-# glassfish_asadmin "set configs.config.server-config.iiop-service.iiop-listener.SSL_MUTUALAUTH.ssl.ssl3-tls-ciphers=#{node['glassfish']['ciphersuite']}" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
 
 # Needed by Shibboleth
 glassfish_asadmin "create-network-listener --protocol http-listener-1 --listenerport 8009 --jkenabled true jk-connector" do
@@ -589,12 +589,8 @@ glassfish_asadmin "set-log-levels org.glassfish.grizzly.http.server.util.Request
    secure false
 end
 
-
-#
-# Enable Single Sign on
-#
-
-glassfish_asadmin "set server-config.http-service.virtual-server.server.property.sso-enabled='true'" do
+# Set correct thread-priority for the executor services - required during updates
+glassfish_asadmin "set resources.managed-executor-service.concurrent\/hopsExecutorService.thread-priority=10" do
    domain_name domain_name
    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
    username username
@@ -602,23 +598,24 @@ glassfish_asadmin "set server-config.http-service.virtual-server.server.property
    secure false
 end
 
-# glassfish_asadmin "set default-config.http-service.virtual-server.server.property.sso-enabled='true'" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
+glassfish_asadmin "set resources.managed-thread-factory.concurrent\/hopsThreadFactory.thread-priority=10" do
+   domain_name domain_name
+   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+   username username
+   admin_port admin_port
+   secure false
+end
 
-
-# glassfish_asadmin "set cluster.availability-service.web-container-availability.sso-failover-enabled=true" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
+#
+# Enable Single Sign on
+#
+glassfish_asadmin "set server-config.http-service.virtual-server.server.property.sso-enabled='true'" do
+   domain_name domain_name
+   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+   username username
+   admin_port admin_port
+   secure false
+end
 
 glassfish_asadmin "set server-config.http-service.virtual-server.server.property.sso-max-inactive-seconds=300" do
    domain_name domain_name
@@ -652,29 +649,14 @@ glassfish_asadmin "set default-config.http-service.virtual-server.server.propert
    secure false
 end
 
-# glassfish_asadmin "set resources.managed-executor-service.concurrent/__defaultManagedExecutorService.core-pool-size=1500" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
-# glassfish_asadmin "set resources.managed-executor-service.concurrent/__defaultManagedExecutorService.maximum-pool-size=2800" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
-# glassfish_asadmin "set resources.managed-executor-service.concurrent/__defaultManagedExecutorService.task-queue-capacity=10000" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
+# Allow following symlinks from docroot
+glassfish_asadmin "set server-config.http-service.virtual-server.server.property.allowLinking=true" do
+   domain_name domain_name
+   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+   username username
+   admin_port admin_port
+   secure false
+end
 
 glassfish_asadmin "create-managed-executor-service --enabled=true --longrunningtasks=true --corepoolsize=10 --maximumpoolsize=200 --keepaliveseconds=60 --taskqueuecapacity=10000 concurrent/kagentExecutorService" do
    domain_name domain_name
@@ -779,65 +761,6 @@ if node['hopsworks']['http_logs']['enabled'].eql? "true"
   end
 end
 
-# Needed by AJP and Shibboleth - https://github.com/payara/Payara/issues/350
-
-
-# cluster="hopsworks"
-
-# glassfish_asadmin "create-cluster #{cluster}" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
-# glassfish_asadmin "#asadmin --host das_host --port das_port create-local-instance --node #{hostname} instance_#{hostname}" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
-
-# glassfish_asadmin "create-local-instance --cluster #{cluster} instance1" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
-
-# TODO - set ejb timer source as a cluster called 'hopsworks'
-# https://docs.oracle.com/cd/E18930_01/html/821-2418/beahw.html#gktqo
-# glassfish_asadmin "set configs.config.hopsworks-config.ejb-container.ejb-timer-service.timer-datasource=#{timerDB}" do
-#    domain_name domain_name
-#    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
-#    username username
-#    admin_port admin_port
-#    secure false
-# end
-
-
-if node['hopsworks']['email_password'].eql? "password"
-
-  bash 'gmail' do
-    user "root"
-    code <<-EOF
-      cd #{Chef::Config['file_cache_path']}
-      rm -f #{Chef::Config['file_cache_path']}/hopsworks.email
-      wget #{node['hopsworks']['gmail']['placeholder']}
-      cat #{Chef::Config['file_cache_path']}/hopsworks.email | base64 -d > #{Chef::Config['file_cache_path']}/hopsworks.encoded
-      chmod 775 #{Chef::Config['file_cache_path']}/hopsworks.encoded
-    EOF
-  end
-
-end
-
-
-
 hopsworks_mail "gmail" do
    domain_name domain_name
    password_file "#{domains_dir}/#{domain_name}_admin_passwd"
@@ -846,12 +769,11 @@ hopsworks_mail "gmail" do
    action :jndi
 end
 
-
-
 node.override['glassfish']['asadmin']['timeout'] = 400
 
+
 glassfish_deployable "hopsworks-ear" do
-  component_name "hopsworks-ear"
+  component_name "hopsworks-ear:#{node['hopsworks']['version']}"
   target "server"
   url node['hopsworks']['ear_url']
   version node['hopsworks']['version']
@@ -863,14 +785,14 @@ glassfish_deployable "hopsworks-ear" do
   action :deploy
   async_replication false
   retries 1
-  not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-applications --type ejb | grep -w 'hopsworks-ear'"
+  keep_state true
+  enabled true
+  not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-applications --type ejb | grep -w \"hopsworks-ear:#{node['hopsworks']['version']}\""
 end
 
 
-
-
 glassfish_deployable "hopsworks" do
-  component_name "hopsworks-web"
+  component_name "hopsworks-web:#{node['hopsworks']['version']}"
   target "server"
   url node['hopsworks']['war_url']
   version node['hopsworks']['version']
@@ -883,15 +805,18 @@ glassfish_deployable "hopsworks" do
   action :deploy
   async_replication false
   retries 1
-  not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-applications --type ejb | grep -v hopsworks-ear | grep hopsworks"
+  keep_state true
+  enabled true
+  not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-applications --type web | grep -w \"hopsworks-web:#{node['hopsworks']['version']}\""
 end
 
 
 glassfish_deployable "hopsworks-ca" do
-  component_name "hopsworks-ca"
+  component_name "hopsworks-ca:#{node['hopsworks']['version']}"
   target "server"
   url node['hopsworks']['ca_url']
   version node['hopsworks']['version']
+  context_root "/hopsworks-ca"
   domain_name domain_name
   password_file "#{domains_dir}/#{domain_name}_admin_passwd"
   username username
@@ -900,8 +825,50 @@ glassfish_deployable "hopsworks-ca" do
   action :deploy
   async_replication false
   retries 1
-  not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-applications --type ejb | grep -w hopsworks-ca"
+  keep_state true
+  enabled true
+  not_if "#{asadmin} --user #{username} --passwordfile #{admin_pwd}  list-applications --type ejb | grep -w \"hopsworks-ca:#{node['hopsworks']['version']}\""
 end
+
+
+#
+# If deployment of the new version succeeds, then undeploy the previous version
+#
+
+glassfish_deployable "undeploy_hopsworks-ear" do
+  component_name "hopsworks-ear:#{previous_version}"
+  target "server"
+  domain_name domain_name
+  password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+  username username
+  admin_port admin_port
+  secure true
+  action :undeploy
+end
+
+glassfish_deployable "undeploy_hopsworks-war" do
+  component_name "hopsworks-web:#{previous_version}"
+  target "server"
+  domain_name domain_name
+  password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+  username username
+  admin_port admin_port
+  secure true
+  action :undeploy
+end
+
+glassfish_deployable "undeploy_hopsworks-ca" do
+  component_name "hopsworks-ca:#{previous_version}"
+  target "server"
+  domain_name domain_name
+  password_file "#{domains_dir}/#{domain_name}_admin_passwd"
+  username username
+  admin_port admin_port
+  secure true
+  action :undeploy
+end
+
+
 
 template "/bin/hopsworks-2fa" do
     source "hopsworks-2fa.erb"
@@ -912,10 +879,51 @@ template "/bin/hopsworks-2fa" do
 
 hopsworks_certs "generate-certs" do
   action :generate
+  notifies :create, 'link[crl-symlink]', :immediately
+end
+
+# Create soft link from intermediateCA CRL to DOMAIN1/docroot
+link "crl-symlink" do
+  to "#{node['certs']['dir']}/intermediate/crl/intermediate.crl.pem"
+  target_file "#{domains_dir}/#{domain_name}/docroot/intermediate.crl.pem"
+  owner node['glassfish']['user']
+  group node['glassfish']['group']
+end
+
+template "#{domains_dir}/#{domain_name}/bin/tensorboard.sh" do
+  source "tensorboard.sh.erb"
+  owner node['glassfish']['user']
+  group node['conda']['group']
+  mode 0750
+  action :create
+end
+
+template "#{domains_dir}/#{domain_name}/bin/tensorboard-launch.sh" do
+  source "tensorboard-launch.sh.erb"
+  owner node['glassfish']['user']
+  group node['conda']['group']
+  mode 0750
+  action :create
 end
 
 template "#{domains_dir}/#{domain_name}/bin/condasearch.sh" do
   source "condasearch.sh.erb"
+  owner node['glassfish']['user']
+  group node['glassfish']['group']
+  mode 0750
+  action :create
+end
+
+template "#{domains_dir}/#{domain_name}/bin/pipsearch.sh" do
+  source "pipsearch.sh.erb"
+  owner node['glassfish']['user']
+  group node['glassfish']['group']
+  mode 0750
+  action :create
+end
+
+template "#{domains_dir}/#{domain_name}/bin/list_environment.sh" do
+  source "list_environment.sh.erb"
   owner node['glassfish']['user']
   group node['glassfish']['group']
   mode 0750
@@ -930,8 +938,6 @@ template "#{domains_dir}/#{domain_name}/bin/condalist.sh" do
   action :create
 end
 
-
-
 bash 'enable_sso' do
   user "root"
   code <<-EOF
@@ -941,22 +947,9 @@ bash 'enable_sso' do
     EOF
 end
 
-
-
-bash "pip_upgrade" do
-    user "root"
-    code <<-EOF
-      set -e
-      pip install --upgrade pip
-    EOF
-end
-
-scala_home=
 case node['platform']
  when 'debian', 'ubuntu'
-   scala_home="/usr/share/scala-2.11"
-   package "scala" do
-   end
+   package "scala"
  when 'redhat', 'centos', 'fedora'
 
   bash 'scala-install-redhat' do
@@ -969,165 +962,9 @@ case node['platform']
     EOF
     not_if "which scala"
   end
-
-
-  scala_home="/usr/share/scala-2.11"
 end
-
-
-#
-# https://github.com/jupyter-incubator/sparkmagic
-#
-bash "jupyter-sparkmagic" do
-  user 'root'
-    retries 1
-    code <<-EOF
-    set -e
-    pip install --upgrade urllib3
-    pip install --upgrade requests
-    pip install --upgrade jupyter
-    pip install --upgrade sparkmagic
-EOF
-end
-
-
-bash "pydoop" do
-    user 'root'
-    retries 1
-    environment ({'JAVA_HOME' => node['java']['java_home'],
-                 'HADOOP_HOME' => node['hops']['base_dir']})
-    code <<-EOF
-      set -e
-      pip install --no-cache-dir hdfscontents
-    EOF
-    not_if "python -c 'import pydoop'"
-end
-
-
-
-bash "jupyter-sparkmagic-enable" do
-    user "root"
-    code <<-EOF
-    jupyter nbextension enable --py --sys-prefix widgetsnbextension
-EOF
-end
-
-
-if node['hopsworks']['pixiedust']['enabled'].to_str.eql?("true")
-  cloudant="cloudant-spark-v2.0.0-185.jar"
-  # Pixiedust is a visualization library for Jupyter
-  pixiedust_home="#{node['jupyter']['base_dir']}/pixiedust"
-  bash "jupyter-pixiedust" do
-    user "root"
-#    node['jupyter']['user']
-    retries 1
-    ignore_failure true
-    code <<-EOF
-      set -e
-      mkdir -p #{pixiedust_home}/bin
-      cd #{pixiedust_home}/bin
-      export PIXIEDUST_HOME=#{pixiedust_home}
-      export SPARK_HOME=#{node['hadoop_spark']['base_dir']}
-      export SCALA_HOME=#{scala_home}
-      pip --no-cache-dir install matplotlib
-      pip --no-cache-dir install pixiedust
-      wget https://github.com/cloudant-labs/spark-cloudant/releases/download/v2.0.0/#{cloudant}
-      jupyter pixiedust install --silent
- #      chown #{node['jupyter']['user']} -R #{pixiedust_home}
-# pythonwithpixiedustspark22 - install in /usr/local/share/jupyter/kernels
-      if [ -d /home/#{node['hopsworks']['user']}/.local/share/jupyter/kernels ] ; then
-         jupyter-kernelspec install /root/.local/share/jupyter/kernels/pythonwithpixiedustspark22
-#/usr/local/share/jupyter/kernels/pythonwithpixiedustspark2[0-9]
-#/home/#{node['jupyter']['user']}/.local/
-      fi
-    EOF
-    not_if "test -f #{pixiedust_home}/bin/#{cloudant}"
-  end
-
-end
-
-pythondir=""
-case node['platform']
- when 'debian', 'ubuntu'
-  pythondir="/usr/local/lib/python2.7/dist-packages"
- when 'redhat', 'centos', 'fedora'
-  pythondir="/usr/lib/python2.7/site-packages"
-end
-
-bash "jupyter-kernels" do
-  user "root"
-  code <<-EOF
-    set -e
-    cd #{pythondir}
-    export HADOOP_HOME=#{node['hops']['base_dir']}
-    jupyter-kernelspec install sparkmagic/kernels/sparkkernel
-    jupyter-kernelspec install sparkmagic/kernels/pysparkkernel
-    jupyter-kernelspec install sparkmagic/kernels/pyspark3kernel
-    jupyter-kernelspec install sparkmagic/kernels/sparkrkernel
-   EOF
-end
-
-
-#
-# (Optional) Enable the server extension so that clusters can be programatically changed
-#
-
-case node['platform']
-when 'debian', 'ubuntu'
-
-  bash "jupyter-sparkmagic-kernel" do
-    user "root"
-    code <<-EOF
-    set -e
-    cd #{pythondir}
-    # workaround for https://github.com/ipython/ipython/issues/9656
-    pip uninstall -y backports.shutil_get_terminal_size
-    pip install --upgrade backports.shutil_get_terminal_size
-    export HADOOP_HOME=#{node['hops']['base_dir']}
-    jupyter serverextension enable --py sparkmagic
-   EOF
-  end
-when 'redhat', 'centos', 'fedora'
-
-  bash "jupyter-sparkmagic-kernel" do
-    user "root"
-    code <<-EOF
-    set -e
-    # workaround for https://github.com/ipython/ipython/issues/9656
-    pip uninstall -y backports.shutil_get_terminal_size
-    pip install --upgrade backports.shutil_get_terminal_size
-    # https://github.com/conda/conda/issues/4823
-    pip install 'configparser===3.5.0b2'
-    export HADOOP_HOME=#{node['hops']['base_dir']}
-    jupyter serverextension enable --py sparkmagic
-   EOF
-  end
-
-end
-
 
 homedir = "/home/#{node['hopsworks']['user']}"
-
-
-# directory "#{homedir}/.sparkmagic"  do
-#   owner node['hopsworks']['user']
-#   group node['hopsworks']['group']
-#   mode "755"
-#   action :create
-# end
-
-
-# template "#{homedir}/.sparkmagic/config.json" do
-#   source "config.json.erb"
-#   owner node['hopsworks']['user']
-#   mode 0750
-#   action :create
-#   variables({
-#               :livy_ip => livy_ip,
-#                :homedir => homedir
-#   })
-# end
-
 #
 # Disable glassfish service, if node['services']['enabled'] is not set to true
 #
@@ -1175,6 +1012,19 @@ directory node['hopsworks']['staging_dir'] + "/private_dirs"  do
   action :create
 end
 
+directory node['hopsworks']['staging_dir'] + "/serving"  do
+  owner node['tfserving']['user']
+  group node['hopsworks']['group']
+  mode "0730"
+  action :create
+end
+
+directory node['hopsworks']['staging_dir'] + "/tensorboard"  do
+  owner node['conda']['user']
+  group node['hopsworks']['group']
+  mode "0770"
+  action :create
+end
 
 
 kagent_keys "#{homedir}" do
@@ -1210,56 +1060,6 @@ template "#{domains_dir}/#{domain_name}/bin/convert-ipython-notebook.sh" do
   action :create
 end
 
-pythonDir="/usr/lib/python2.7/site-packages"
-case node['platform']
- when 'debian', 'ubuntu'
-   pythonDir="/usr/local/lib/python2.7/dist-packages"
- when 'redhat', 'centos', 'fedora'
-   pythonDir="/usr/lib/python2.7/site-packages"
-end
-
-
-bash "jupyter-root-sparkmagic" do
-  user 'root'
-  code <<-EOF
-    set -e
-    source ~/.bashrc
-    pip uninstall numpy -y
-    pip install --target #{pythonDir} --upgrade numpy
-    pip uninstall pbr -y
-    pip install --target #{pythonDir} --upgrade pbr
-    pip uninstall funcsigs -y
-    pip install --target #{pythonDir} --upgrade funcsigs
-    pip uninstall setuptools  -y
-    pip install --target #{pythonDir} --upgrade setuptools
-    pip uninstall mock  -y
-    pip install --target #{pythonDir} --upgrade mock
-    pip uninstall configparser  -y
-    pip install --target #{pythonDir} --upgrade configparser
-    pip uninstall sparkmagic  -y
-    pip install --target #{pythonDir} --upgrade sparkmagic
-   EOF
-end
-
-if vagrant_enabled == 1
-  bash "fix_owner_ship_pip_files" do
-    user 'root'
-    code <<-EOF
-    if [ -d /home/#{node['jupyter']['user']}/.local ] ; then
-       chown -R #{node['jupyter']['user']} /home/#{node['jupyter']['user']}/.local
-    fi
-   EOF
-  end
-end
-
-
-bash "jupyter-user-sparkmagic" do
-  user 'root'
-  code <<-EOF
-    su -l #{node['jupyter']['user']} -c "pip install --upgrade --no-cache-dir --user sparkmagic"
-   EOF
-end
-
 directory "/usr/local/share/jupyter/nbextensions/facets-dist"  do
   owner "root"
   group "root"
@@ -1289,4 +1089,95 @@ template "#{theDomain}/docroot/nbextensions/facets-dist/facets-jupyter.html" do
   group node['glassfish']['group']
   mode 0775
   action :create
+end
+
+include_recipe "tensorflow::serving"
+
+link "#{node['kagent']['certs_dir']}/cacerts.jks" do
+  owner node['glassfish']['user']
+  group node['glassfish']['group']
+  to "#{theDomain}/config/cacerts.jks"
+end
+
+#
+# Need to synchronize conda enviornments for newly joined or rejoining nodes.
+#
+package "rsync"
+
+homedir = node['hopsworks']['user'].eql?("root") ? "/root" : "/home/#{node['hopsworks']['user']}"
+Chef::Log.info "Home dir is #{homedir}. Generating ssh keys..."
+
+kagent_keys "#{homedir}" do
+  cb_user node['hopsworks']['user']
+  cb_group node['hopsworks']['group']
+  action :generate
+end
+
+kagent_keys "#{homedir}" do
+  cb_user node['hopsworks']['user']
+  cb_group node['hopsworks']['group']
+  cb_name "hopsworks"
+  cb_recipe "default"
+  action :return_publickey
+end
+
+
+#
+# Rstudio
+#
+
+if node['rstudio']['enabled'].eql? "true"
+
+  case node['platform']
+  when 'debian', 'ubuntu'
+    package "r-base"
+
+    remote_file "#{Chef::Config['file_cache_path']}/#{node['rstudio']['deb']}" do
+      user node['glassfish']['user']
+      group node['glassfish']['group']
+      source node['download_url'] + "/#{node['rstudio']['deb']}"
+      mode 0755
+      action :create
+    end
+
+    bash 'install_rstudio_debian' do
+      user "root"
+      code <<-EOF
+      set -e
+      cd #{Chef::Config['file_cache_path']}
+      apt-get install gdebi-core -y
+      gdebi #{node['rstudio']['deb']}
+    EOF
+    end
+
+  when 'redhat', 'centos', 'fedora'
+
+    remote_file "#{Chef::Config['file_cache_path']}/#{node['rstudio']['rpm']}" do
+      user node['glassfish']['user']
+      group node['glassfish']['group']
+      source node['download_url'] + "/#{node['rstudio']['rpm']}"
+      mode 0755
+      action :create
+    end
+
+    bash 'install_rstudio_rhel' do
+      user "root"
+      code <<-EOF
+      set -e
+      cd #{Chef::Config['file_cache_path']}
+      yum install --nogpgcheck #{node['rstudio']['rpm']} -y
+    EOF
+    end
+
+  end
+
+  bash 'disable_rstudio_systemd_daemons' do
+    user "root"
+    ignore_failure true
+    code <<-EOF
+      systemctl stop rstudio-server
+      systemctl disable rstudio-server
+    EOF
+  end
+
 end

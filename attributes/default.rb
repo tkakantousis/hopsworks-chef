@@ -1,3 +1,4 @@
+include_attribute "conda"
 include_attribute "kagent"
 include_attribute "ndb"
 include_attribute "hadoop_spark"
@@ -9,11 +10,16 @@ include_attribute "kkafka"
 include_attribute "kzookeeper"
 include_attribute "drelephant"
 include_attribute "dela"
-include_attribute "conda"
 include_attribute "hive2"
+include_attribute "hops"
 
-default['hopsworks']['version']                  = "0.1.0"
+default['hopsworks']['version']                  = node['install']['version']
+default['hopsworks']['current_version']          = node['install']['current_version']
 
+# Flyway needs to know the previous versions of Hopsworks to generate the .sql files.
+# comma-separated string of previous versions hopsworks (not including the current version)
+# E.g., "0.1.1, 0.1.2"
+default['hopsworks']['versions']                 = node['install']['versions']
 
 default['glassfish']['variant']                  = "payara"
 default['hopsworks']['user']                     = node['install']['user'].empty? ? "glassfish" : node['install']['user']
@@ -22,14 +28,16 @@ default['hopsworks']['group']                    = node['install']['user'].empty
 default['glassfish']['group']                    = node['hopsworks']['group']
 default['hopsworks']['admin']['port']            = 4848
 default['hopsworks']['port']                     = "8080"
+default['hopsworks']['secure_port']              = "8181"
 default['glassfish']['admin']['port']            = node['hopsworks']['admin']['port']
 default['glassfish']['port']                     = node['hopsworks']['port'].to_i
-default['glassfish']['version']                  = '4.1.2.173'
+default['glassfish']['version']                  = '4.1.2.174'  # '5.182'
 
 default['hopsworks']['dir']                      = node['install']['dir'].empty? ? "/usr/local" : node['install']['dir']
 default['glassfish']['install_dir']              = node['hopsworks']['dir']
 default['glassfish']['base_dir']                 = node['glassfish']['install_dir'] + "/glassfish"
 default['hopsworks']['domains_dir']              = node['install']['dir'].empty? ? node['hopsworks']['dir'] + "/domains" : node['install']['dir'] + "/domains"
+default['hopsworks']['domain_name']              = "domain1"
 default['glassfish']['domains_dir']              = node['hopsworks']['domains_dir']
 
 default['hopsworks']['staging_dir']              = node['hopsworks']['dir'] + "/staging"
@@ -47,25 +55,26 @@ default['glassfish']['max_perm_size']            = node['hopsworks']['max_perm_s
 default['hopsworks']['max_stack_size']           = "1500"
 default['glassfish']['max_stack_size']           = node['hopsworks']['max_stack_size'].to_i
 default['hopsworks']['http_logs']['enabled']     = "true"
-
+default['hopsworks']['env_var_file']             = "#{node['hopsworks']['domains_dir']}/#{node['hopsworks']['domain_name']}_environment_variables"
 
 default['glassfish']['package_url']              = node['download_url'] + "/payara-#{node['glassfish']['version']}.zip"
-default['hopsworks']['cauth_url']                = "#{node['download_url']}/otp-auth-2.0.jar"
+default['hopsworks']['cauth_version']            = "otp-auth-0.3.0.jar"
+default['hopsworks']['cauth_url']                = "#{node['download_url']}/#{node['hopsworks']['cauth_version']}"
+
 default['hopsworks']['war_url']                  = "#{node['download_url']}/hopsworks/#{node['hopsworks']['version']}/hopsworks-web.war"
 default['hopsworks']['ca_url']                   = "#{node['download_url']}/hopsworks/#{node['hopsworks']['version']}/hopsworks-ca.war"
 default['hopsworks']['ear_url']                  = "#{node['download_url']}/hopsworks/#{node['hopsworks']['version']}/hopsworks-ear.ear"
-
 
 default['hopsworks']['pixiedust']['enabled']        = "false"
 
 default['hopsworks']['admin']['user']               = "adminuser"
 default['hopsworks']['admin']['password']           = "adminpw"
-default['glassfish']['cert']['password']            = "#{node['hopsworks']['admin']['password']}"
 default['hopsworks']['twofactor_auth']              = "false"
 default['hopsworks']['twofactor_exclude_groups']    = "AGENT;CLUSTER_AGENT" #semicolon separated list of roles
 default['hopsworks']['blacklist_users']             = "devices@hops.io" #comma-separated list of users that are not allowed to login
 
 
+default['hopsworks']['service_key_rotation_enabled'] = "false"
 ## Suffix can be: (defaults to minutes if omitted)
 ## ms: milliseconds
 ## s: seconds
@@ -73,8 +82,18 @@ default['hopsworks']['blacklist_users']             = "devices@hops.io" #comma-s
 ## h: hours
 ## d: days
 default['hopsworks']['cert_mater_delay']         = "3m"
+default['hopsworks']['service_key_rotation_interval'] = "2d"
+default['hopsworks']['application_certificate_validity_period'] = "3d"
 
-default['hopsworks']['mysql_connector_url']      = "http://snurran.sics.se/hops/mysql-connector-java-5.1.29-bin.jar"
+#Time in milliseconds to wait after a TensorBoard is requested before considering it old (and should be killed)
+default['hopsworks']['tensorboard_max_last_accessed'] = "1140000"
+
+#Max number of bytes of logs to show in Spark UI
+default['hopsworks']['spark_ui_logs_offset'] = "512000"
+#Log level of REST API
+default['hopsworks']['hopsworks_rest_log_level'] = "PROD"
+
+default['hopsworks']['mysql_connector_url']         = "#{node['download_url']}/mysql-connector-java-5.1.29-bin.jar"
 
 default['hopsworks']['cert']['cn']                  = "sics.se"
 default['hopsworks']['cert']['o']                   = "swedish ict"
@@ -86,8 +105,13 @@ default['hopsworks']['cert']['c']                   = "se"
 default['hopsworks']['cert']['password']            = "changeit"
 default['hopsworks']['master']['password']          = "adminpw"
 
-default['hopsworks']['public_ips']               = ['10.0.2.15']
-default['hopsworks']['private_ips']              = ['10.0.2.15']
+
+
+default['hopsworks']['cert']['user_cert_valid_days'] = "12"
+
+default['hopsworks']['public_ips']                  = ['10.0.2.15']
+default['hopsworks']['private_ips']                 = ['10.0.2.15']
+#default['hopsworks']['http_secure_enabled']         = "1"
 
 default['kagent']['enabled']                     = "false"
 
@@ -96,19 +120,22 @@ default['hopsworks']['smtp_port']                = node['smtp']['port']
 default['hopsworks']['smtp_ssl_port']            = node['smtp']['ssl_port']
 default['hopsworks']['email']                    = node['smtp']['email']
 default['hopsworks']['email_password']           = node['smtp']['email_password']
-default['hopsworks']['gmail']['placeholder']     = "http://snurran.sics.se/hops/hopsworks.email"
 
 default['hopsworks']['alert_email_addrs']        = ""
 
-# #quotas
-default['hopsworks']['yarn_default_quota_mins']  = "1000000"
-default['hopsworks']['hdfs_default_quota_mbs']   = "500000"
-default['hopsworks']['hive_default_quota_mbs']   = "250000"
-default['hopsworks']['max_num_proj_per_user']    = "10"
+default['hopsworks']['support_email_addr']       = "support@hops.io"
 
-# file preview
+# #quotas
+default['hopsworks']['yarn_default_quota_mins']          = "1000000"
+default['hopsworks']['hdfs_default_quota_mbs']           = "500000"
+default['hopsworks']['hive_default_quota_mbs']           = "250000"
+default['hopsworks']['featurestore_default_quota_mbs']   = "250000"
+default['hopsworks']['max_num_proj_per_user']            = "10"
+
+# file preview and download
 default['hopsworks']['file_preview_image_size']  = "10000000"
 default['hopsworks']['file_preview_txt_size']    = "100"
+default['hopsworks']['download_allowed']         = "true"
 
 default['hops']['user_envs']                     = "false"
 
@@ -135,6 +162,7 @@ default['hopsworks']['encryption_password']      = "adminpw"
 #
 # Dela  - please do not change without consulting dela code
 #
+default['hopsworks']['public_https_port']              = node['hopsworks']['secure_port']
 default['hopsworks']['dela']['enabled']                = "false"
 default['hopsworks']['dela']['public_hopsworks_port']  = node['hopsworks']['port']
 default['hopsworks']['dela']['cluster_http_port']      = 42000 #TODO - fix to read from dela recipe
@@ -166,7 +194,7 @@ if(node['hopsworks']['hopssite']['version'].eql? "hops-demo")
 end
 if(node['hopsworks']['hopssite']['version'].eql? "bbc5")
   default['hopsworks']['dela']['enabled']              = "true"
-  default['hopsworks']['dela']['client']               = "FULL_CLIENT"
+  default['hopsworks']['dela']['client']               = "BASE_CLIENT"
   default['hopsworks']['hopssite']['domain']           = "bbc5.sics.se"
   default['hopsworks']['hopssite']['port']             = 43080
   default['hopsworks']['hopssite']['register_port']    = 8080
@@ -177,16 +205,19 @@ default['hopsworks']['hopssite']['heartbeat']          = "600000"
 #
 # hops.site settings for cert signing
 #
+default['hopssite']['download_url']                    = "#{node['download_url']}/hopssite/hops-site.war"
 default['hopssite']['manual_register']                 = "false"
+default['hopssite']['dela']['version']                 = "0.1.0"
 default['hopssite']['dir']                             = node['install']['dir'].empty? ? "/usr/local" : node['install']['dir']
 default['hopssite']['home']                            = node['hopssite']['dir'] + "/hopssite"
 default['hopssite']['user']                            = node['hopsworks']['email']
 default['hopssite']['password']                        = "admin"
-default['hopssite']['base_dir']                        = node['hopsworks']['domains_dir'] + "/domain1"
+default['hopssite']['base_dir']                        = node['hopsworks']['domains_dir'] + "/" + node['hopsworks']['domain_name']
 default['hopssite']['certs_dir']                       = "#{node['hopsworks']['dir']}/certs-dir/hops-site-certs"
 default['hopssite']['keystore_dir']                    = "#{node['hopssite']['certs_dir']}/keystores"
 default['hopssite']['retry_interval']                  = 60
 default['hopssite']['max_retries']                     = 5
+default['hopssite']['admin']['password']               = "adminpw"
 #
 # Hopssite cert
 #
@@ -202,8 +233,10 @@ default['hopssite']['cert']['c']                       = node['hopsworks']['cert
 default['hopsworks']['max_gpu_request_size']           = 1
 default['hopsworks']['max_cpu_request_size']           = 1
 
-default['hopsworks']['anaconda_enabled']               = node['kagent']['conda_enabled']
+default['hopsworks']['anaconda_enabled']               = "true"
 
+# Comma separated list of IPs on which you should not enable conda.
+default['hopsworks']['nonconda_hosts']               = ""
 
 #
 # Jupyter
@@ -213,30 +246,39 @@ default['jupyter']['user']                             = node['install']['user']
 default['jupyter']['group']                            = node['install']['user'].empty? ? "jupyter" : node['install']['user']
 default['jupyter']['python']                           = "true"
 
-
 #
 # TensorFlow Serving
 #
-
+default['tfserving']['base_dir']                       = node['install']['dir'].empty? ? node['hopsworks']['dir'] + "/staging" : node['install']['dir'] + "/staging"
 default['tfserving']['user']                           = node['install']['user'].empty? ? "tfserving" : node['install']['user']
 default['tfserving']['group']                          = node['install']['user'].empty? ? "tfserving" : node['install']['user']
+default['tfserving']['pool_size']                      = "40"
+default['tfserving']['max_route_connections']          = "10"
 
+#
+# PyPi
+#
+default['hopsworks']['pypi_rest_endpoint']             = "https://pypi.org/pypi/{package}/json"
 
 # Livy
 default['hopsworks']['livy_zeppelin_session_timeout']  = "3600"
 
 # Zeppelin
-default['hopsworks']['zeppelin_interpreters']  = "org.apache.zeppelin.livy.LivySparkInterpreter,org.apache.zeppelin.livy.LivyPySparkInterpreter,org.apache.zeppelin.livy.LivySparkRInterpreter,org.apache.zeppelin.livy.LivySparkSQLInterpreter,org.apache.zeppelin.spark.SparkInterpreter,org.apache.zeppelin.spark.PySparkInterpreter,org.apache.zeppelin.rinterpreter.RRepl,org.apache.zeppelin.rinterpreter.KnitR,org.apache.zeppelin.spark.SparkRInterpreter,org.apache.zeppelin.spark.SparkSqlInterpreter,org.apache.zeppelin.spark.DepInterpreter,org.apache.zeppelin.markdown.Markdown,org.apache.zeppelin.angular.AngularInterpreter,org.apache.zeppelin.flink.FlinkInterpreter"
+default['hopsworks']['zeppelin_interpreters']  = "org.apache.zeppelin.hopshive.HopsHiveInterpreter"
 
 
+#
+# Database upgrades
+#
+# "https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/5.0.3/flyway-commandline-5.0.3-linux-x64.tar.gz"
+default['hopsworks']['flyway']['version']              = "5.0.3"
+default['hopsworks']['flyway_url']                     = node['download_url'] + "/flyway-commandline-#{node['hopsworks']['flyway']['version']}-linux-x64.tar.gz"
 
 
 #
 #
+# Virtualbox Image support
 #
-#
-
-
 
 default["lightdm"]["service_name"] = "lightdm"
 default["lightdm"]["sysconfig_file"] = "/etc/sysconfig/displaymanager"
@@ -247,7 +289,6 @@ default["lightdm"]["minimum_uid"] = 1000
 default["lightdm"]["hidden_users"] = %w(nobody)
 default["lightdm"]["hidden_shells"] = %w(/bin/false /sbin/nologin)
 default["lightdm"]["keyrings"] = {}
-
 
 #
 # LDAP
@@ -276,3 +317,32 @@ default['ldap']['security_principal']                = ""
 default['ldap']['security_credentials']              = ""
 default['ldap']['referral']                          = "follow"
 default['ldap']['additional_props']                  = ""
+
+default['dtrx']['version']                           = "dtrx-7.1.tar.gz"
+default['rstudio']['deb']                            = "rstudio-server-1.1.447-amd64.deb"
+default['rstudio']['rpm']                            = "rstudio-server-rhel-1.1.447-x86_64.rpm"
+default['rstudio']['enabled']                        = "false"
+
+default['hopsworks']['kafka_max_num_topics']                   = '100'
+
+#
+# JWT
+#
+
+default['hopsworks']['jwt']['signature_algorithm']   = 'HS512'
+default['hopsworks']['jwt']['lifetime_ms']           = '1800000'
+default['hopsworks']['jwt']['exp_leeway_sec']        = '900'
+default['hopsworks']['jwt']['signing_key_name']      = 'apiKey'
+default['hopsworks']['jwt']['issuer']                = 'hopsworks@logicalclocks.com'
+
+#
+# EXPAT
+#
+ 
+default['hopsworks']['expat_url']                    = "#{node['download_url']}/expat/#{node['install']['version']}/expat-#{node['install']['version']}.tar.gz"
+default['hopsworks']['expat_dir']                    = "#{node['install']['dir']}/expat-#{node['install']['version']}"
+
+#
+# Feature Store
+#
+default['hopsworks']['featurestore_default_storage_format']   = "ORC"

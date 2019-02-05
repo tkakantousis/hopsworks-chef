@@ -4,7 +4,7 @@ maintainer_email "jdowling@kth.se"
 license          "Apache v2.0"
 description      "Installs/Configures HopsWorks, the UI for Hops Hadoop."
 long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
-version          "0.3.0"
+version          "0.9.0"
 source_url       "https://github.com/hopshadoop/hopsworks-chef"
 
 
@@ -46,25 +46,16 @@ recipe  "hopsworks::slave", "Hopsworks master instance that will store only an i
 recipe  "hopsworks::dev", "Installs development libraries needed for HopsWorks development."
 recipe  "hopsworks::letsencypt", "Given a glassfish installation and a letscrypt installation, update glassfish's key."
 recipe  "hopsworks::image", "Prepare for use as a virtualbox image."
+recipe  "hopsworks::rollback", "Rollback an upgrade to Hopsworks."
+
+recipe  "hopsworks::migrate", "Call expat to migrate between Hopsworks versions"
+
 recipe  "hopsworks::purge", "Deletes glassfish installation."
 recipe  "hopsworks::hopssite", "Install hopssite on current vm"
-recipe  "hopsworks::dela", "Register dela on current vm"
+recipe  "hopsworks::delaregister", "Register dela on current vm - mainly for demos"
 #######################################################################################
 # Required Attributes
 #######################################################################################
-
-attribute "java/jdk_version",
-          :display_name =>  "Jdk version",
-          :type => 'string'
-
-attribute "java/install_flavor",
-          :display_name =>  "Oracle (default) or openjdk",
-          :type => 'string'
-
-attribute "kapacitor/notify/email",
-          :description => "Email address. Recommended to use a gmail account",
-          :required => "required",
-          :type => 'string'
 
 attribute "hopsworks/default/private_ips",
           :description => "ip addrs",
@@ -86,6 +77,18 @@ attribute "hopsworks/twofactor_auth",
 
 attribute "hopsworks/cert_mater_delay",
           :description => "Delay for the Certificate Materialization service of Hopsworks to delete the certificates from the local fs",
+          :type => 'string'
+
+attribute "hopsworks/service_key_rotation_enabled",
+          :description => "Configuration option to enable/disable automatic service key rotation",
+          :type => 'string'
+
+attribute "hopsworks/service_key_rotation_interval",
+          :description => "Interval for Hops service certificates rotation",
+          :type => 'string'
+
+attribute "hopsworks/application_certificate_validity_period",
+          :description => "Application certificate validity period. Certificates will be rotated well before the expiration",
           :type => 'string'
 
 attribute "hopsworks/smtp",
@@ -130,13 +133,31 @@ attribute "hopsworks/domains_dir",
           :description => "Installation directory for the glassfish domains",
           :type => 'string'
 
+attribute "hopsworks/domain_truststore",
+          :description => "Name of the glassfish truststore for this domain.",
+          :type => 'string'
+
+attribute "hopsworks/domain_truststore_path",
+          :description => "Path where domain_truststore is stored",
+          :type => 'string'
+
 attribute "hopsworks/master/password",
           :description => "Web Application Server master password",
           :type => 'string'
 
+#attribute "hopsworks/http_secure_enabled",
+#          :description => "Indicates if there is an HTTPS listener enabled",
+#          :type => 'string'
+
 attribute "download_url",
           :description => "URL for downloading binaries",
           :type => 'string'
+
+
+attribute "hopsworks/cert/user_cert_valid_days",
+           :description => "How long in days will the user certs be valid. Default 12 days.",
+           :type => 'string'
+
 
 attribute "hopsworks/cert/password",
            :description => "password to glassfish certs",
@@ -180,6 +201,10 @@ attribute "glassfish/group",
 
 attribute "hopsworks/port",
           :description => "Port that webserver will listen on",
+          :type => 'string'
+
+attribute "hopsworks/secure_port",
+          :description => "TLS Port that webserver will listen on",
           :type => 'string'
 
 attribute "hopsworks/max_mem",
@@ -234,16 +259,12 @@ attribute "hopsworks/hive_default_quota_mbs",
           :description => "Default amount in MB of available storage per project",
           :type => 'string'
 
+attribute "hopsworks/featurestore_default_quota_mbs",
+          :description => "Default amount in MB of available storage for the featurestore service per project",
+          :type => 'string'
+
 attribute "hopsworks/max_num_proj_per_user",
           :description => "Maximum number of projects that can be created by each user",
-          :type => 'string'
-
-attribute "hopsworks/kafka_num_replicas",
-          :description => "Default number of replicas for Kafka Topics.",
-          :type => 'string'
-
-attribute "hopsworks/kafka_num_partitions",
-          :description => "Default number of partitions for Kafka Topics.",
           :type => 'string'
 
 attribute "hopsworks/encryption_password",
@@ -258,8 +279,16 @@ attribute "hopsworks/file_preview_txt_size",
           :description => "Maximum size in lines of file that can be previewed in DataSets",
           :type => 'string'
 
+attribute "hopsworks/download_allowed",
+          :description => "Whether users should be allowed to download files from datasets. Default value is true.",
+          :type => 'string'
+
 attribute "hopsworks/anaconda_enabled",
           :description => "Default is 'true'. Set to 'false' to disable anaconda.",
+          :type => 'string'
+
+attribute "hopsworks/nonconda_hosts",
+          :description => "Comma separated list of IPs on which you should not enable conda.",
           :type => 'string'
 
 attribute "hopsworks/staging_dir",
@@ -286,12 +315,24 @@ attribute "install/user",
           :description => "User to install the services as",
           :type => "string"
 
+attribute "install/upgrade",
+          :description => "Set to 'true' if updating the cluster. Default 'false'",
+          :type => "string"
+
 attribute "install/ssl",
           :description => "Is SSL turned on for all services?",
           :type => "string"
 
 attribute "install/cleanup_downloads",
           :description => "Remove any zipped binaries that were downloaded and used to install services",
+          :type => "string"
+
+attribute "install/upgrade",
+          :description => "User to upgrade the software",
+          :type => "string"
+
+attribute "install/addhost",
+          :description => "Indicates that this host will be added to an existing Hops cluster.",
           :type => "string"
 
 attribute "hopsworks/monitor_max_status_poll_try",
@@ -697,6 +738,13 @@ attribute "cuda/accept_nvidia_download_terms",
 :description => "Accept cuda licensing terms and conditions. Default: 'false'. Change to 'true' to enable cuda.",
 :type => "string"
 
+attribute "cuda/skip_test",
+          :description => "Dont check if there is a local nvidia card on this machine",
+          :type => "string"
+
+attribute "cuda/skip_stop_xserver",
+          :description => "Dont restart the xserver (probably a localhost installation)",
+          :type => "string"
 
 ##
 ##
@@ -737,11 +785,19 @@ attribute "hops/use_systemd",
           :type => "string"
 
 attribute "hops/format",
-          :description => "Format HDFS",
+          :description => "'true' to format HDFS, 'false' to skip formatting",
           :type => 'string'
 
-attribute "hops/nm/log_dir",
+attribute "hops/reformat",
+          :description => "'true' to re-format HDFS, 'false' to skip re-formatting",
+          :type => 'string'
+
+attribute "hops/yarn/nodemanager_log_dir",
           :description => "The directory in which yarn node manager store containers logs",
+          :type => 'string'
+
+attribute "hops/yarn/nodemanager_recovery_dir",
+          :description => "The directory in which yarn node manager stores recovery state",
           :type => 'string'
 
 attribute "hops/yarn/memory_mbs",
@@ -965,7 +1021,7 @@ attribute "hops/cgroups",
           :description => "'true' to enable cgroups, else (default) 'false'",
           :type => "string"
 
-attribute "hops/rpc/ssl",
+attribute "hops/tls/enabled",
           :description => "'true' to enable ssl, 'false' to disable 'ssl'",
           :type => "string"
 
@@ -1370,9 +1426,17 @@ attribute "zeppelin/dir",
 
 ##
 ##
-## Presto
+## TFServing
 ##
 ##
+
+attribute "tfserving/pool_size",
+          :description => "size of the connection pool for serving inference requests",
+          :type => 'string'
+
+attribute "tfserving/max_route_connections",
+          :description => "max number of connections to serve requests to a unique route",
+          :type => 'string'
 
 ##
 ##
@@ -1391,7 +1455,6 @@ attribute "jupyter/group",
 attribute "jupyter/python",
           :description => "'true' (default) to enable the python interpreter, 'false' to disable it (more secure). ",
           :type => 'string'
-
 
 ##
 ##
@@ -1452,9 +1515,9 @@ attribute "kagent/dashboard/password",
           :description => "kagent password to register with server",
           :type => "string"
 
-attribute "kagent/env_report_freq_in_secs",
-          :description => "How often the kagent sends a full report of its conda environments for synchronization",
-          :type => "string"
+attribute "kagent/dns",
+          :description => "Default 'false'. Set to 'true' to use fully qualified domain names for kagent hosts in Hopsworks.",
+          :type => 'string'
 
 attribute "ndb/mysql_port",
           :description => "Port for the mysql server",
@@ -1539,6 +1602,22 @@ attribute "ndb/group",
 
 attribute "ndb/BackupDataDir",
           :description => "Directory to store mysql cluster backups in",
+          :type => 'string'
+
+attribute "ndb/remote_backup_host",
+          :description => "Hostname of the machine where the backups will be stored",
+          :type => 'string'
+
+attribute "ndb/remote_backup_user",
+          :description => "User on the remote backup machine. SSH access should be configured",
+          :type => 'string'
+
+attribute "ndb/remote_backup_dir",
+          :description => "Directory on the remote backup machine that the archives will be stored",
+          :type => 'string'
+
+attribute "ndb/local_backup_dir",
+          :description => "Directory on the local MGM machine where backups will temporarily be stored",
           :type => 'string'
 
 attribute "mysql/user",
@@ -1786,6 +1865,10 @@ attribute "dela/dir",
           :type => 'string'
 
 # Hopsworks Dela
+attribute "hopsworks/public_https_port",
+          :description => "Hopsworks public https port",
+          :type => 'string'
+
 attribute "hopsworks/hopssite/version",
           :description => "Enable hopssite default versions: hops, hops-demo or bbc5",
           :type => 'string'
@@ -1835,10 +1918,17 @@ attribute "hopsworks/hopssite/register_port",
           :description => "Dela hops site port used for cert registration",
           :type => 'string'
 
+attribute "hopsworks/support_email_addr",
+          :description => "Email address to contact for email registration problems",
+          :type => 'string'
 
 attribute "hopsworks/hopssite/heartbeat",
           :description => "Dela hops site heartbeat",
           :type => 'string'
+
+attribute "hopssite/dela/version",
+       :description => "The hopssite tracker imposed version of dela",
+       :type => 'string'
 
 attribute "hopssite/cert/cn",
 	  :description => "hopssite Organization Common Name (default: hopsworks/cert)",
@@ -1889,6 +1979,12 @@ attribute "hopssite/retry_interval",
 
 attribute "hopssite/max_retries",
           :description => "Certificate signing request maximum number of retries for hops.site.",
+          :type => 'string'
+#
+# hops.site admin
+#
+attribute "hopssite/admin/password",
+          :description => "Password for domain2 - running the hopssite tracker",
           :type => 'string'
 
 # Dela Transfer specific
@@ -2087,4 +2183,97 @@ attribute "ldap/referral",
 
 attribute "ldap/additional_props",
           :description => "LDAP additional properties. '' (default)",
+          :type => 'string'
+
+### Conda
+attribute "conda/mirror_list",
+          :description => "comma separated list of anaconda mirrors",
+          :type => "string"
+
+attribute "conda/use_defaults",
+          :description => "whether or not to add the defaults mirrors to the channels list (default yes)",
+          :type => 'string'
+
+### Kapacitor
+
+attribute "kapacitor/notify/email",
+          :description => "Email address. Recommended to use a gmail account",
+          :type => 'string'
+
+attribute "kapacitor/slack_enabled",
+          :description => "Send notifications to slack",
+          :type => 'string'
+
+attribute "kapacitor/slack_url",
+          :description => "Slack url hook.",
+          :type => 'string'
+
+attribute "kapacitor/slack_channel",
+          :description => "Slack channel name",
+          :type => 'string'
+
+
+### Kafka
+
+attribute "hopsworks/kafka_max_num_topics",
+          :description => "Default max number of kafka topics per project",
+          :type => 'string'
+
+attribute "hopsworks/kafka_num_replicas",
+          :description => "Default number of replicas for Kafka Topics.",
+          :type => 'string'
+
+attribute "hopsworks/kafka_num_partitions",
+          :description => "Default number of partitions for Kafka Topics.",
+          :type => 'string'
+
+
+### RStudio
+
+attribute "rstudio/enabled",
+          :description => "Set to 'true' to enable RStudio in Hopsworks. Default 'false'.",
+          :type => 'string'
+
+### PyPi
+
+attribute "hopsworks/pypi_rest_endpoint",
+          :description => "Url to PyPi REST API to query package information",
+          :type => 'string'
+
+### TensorBoard
+
+attribute "hopsworks/tensorboard_max_last_accessed",
+          :description => "Time in milliseconds to wait after a TensorBoard is requested before considering it old (and should be killed)",
+          :type => 'string'
+
+### JWT
+
+attribute "hopsworks/jwt/signature_algorithm",
+          :description => "Default signature algorithm for jwt. (default HS512)",
+          :type => 'string'
+
+attribute "hopsworks/jwt/lifetime_ms",
+          :description => "Default lifetime in ms for jwt expiration. (default 1800000)",
+          :type => 'string'
+
+attribute "hopsworks/jwt/exp_leeway_sec",
+          :description => "Default expiration leeway in sec. (default 900)",
+          :type => 'string'
+
+attribute "hopsworks/jwt/signing_key_name",
+          :description => "Default signing key name. (default apiKey)",
+          :type => 'string'
+
+attribute "hopsworks/jwt/issuer",
+          :description => "JWT issuer identifier. (default hopsworks@logicalclocks.com)",
+          :type => 'string'
+
+# Fabio remove this before merging
+attribute "install/current_version",
+          :description => "Current installed Hopsworks version",
+          :type => "string"
+
+### Feature Store
+attribute "hopsworks/featurestore_default_storage_format",
+          :description => "Default storage format for the hive database of the feature stores (ORC/PARQUET)",
           :type => 'string'

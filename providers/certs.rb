@@ -13,6 +13,7 @@ bash 'certificateauthority' do
 
 	KEYSTOREPW=#{node['hopsworks']['master']['password']}
 
+        rm -f $HOME/.rnd
 	cd "#{ca_dir}"
         BASEDIR="#{ca_dir}"
 	chmod 700 private
@@ -48,7 +49,7 @@ bash 'certificateauthority' do
 
 	#6 Create the intermediate certificate
 # Done on client
-	[ -f intermediate/csr/intermediate.csr.pem ] || openssl req -new -sha256 -subj "/C=SE/ST=Sweden/L=Stockholm/O=SICS/CN=HopsIntermedtiateCA" \
+	[ -f intermediate/csr/intermediate.csr.pem ] || openssl req -new -sha256 -subj "/C=SE/ST=Sweden/L=Stockholm/O=SICS/CN=HopsIntermediateCA" \
       -key intermediate/private/intermediate.key.pem -passin pass:${KEYSTOREPW} -passout pass:${KEYSTOREPW} -out intermediate/csr/intermediate.csr.pem
 
 
@@ -74,6 +75,10 @@ bash 'certificateauthority' do
         #9 Make the subject non-unique. Otherwise, running /var/lib/kagent-certs/csr.py becomes non idempotent
         # http://www.mad-hacking.net/documentation/linux/security/ssl-tls/signing-csr.xml
         echo "unique_subject = no \n" > intermediate/index.txt.attr
+        
+        # 10 Generate CRL for intermediate CA
+        openssl ca -config intermediate/openssl-intermediate.cnf -gencrl -passin pass:${KEYSTOREPW} -out intermediate/crl/intermediate.crl.pem
+	chown #{node['glassfish']['user']}:#{node['glassfish']['group']} intermediate/crl/intermediate.crl.pem
     EOF
  not_if { ::File.exists?("#{ca_dir}/intermediate/certs/ca-chain.cert.pem" ) }
 end
@@ -91,7 +96,7 @@ action :sign_hopssite do
     code <<-EOF
       set -eo pipefail
       export PYTHON_EGG_CACHE=/tmp
-      #{node['hopsworks']['domains_dir']}/domain1/bin/csr-ca.py
+      #{node['conda']['base_dir']}/envs/hops-system/bin/python #{node['hopsworks']['domains_dir']}/domain1/bin/csr-ca.py
       touch #{signed}
   EOF
     not_if { ::File.exists?( "#{signed}" ) }
