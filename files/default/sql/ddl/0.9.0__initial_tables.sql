@@ -1900,4 +1900,3 @@ ALTER TABLE `hopsworks`.`dataset`
   ADD FOREIGN KEY `featurestore_fk` (`feature_store_id`) REFERENCES `feature_store` (`id`)
   ON DELETE SET NULL
   ON UPDATE NO ACTION;
-
