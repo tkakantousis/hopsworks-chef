@@ -12,6 +12,7 @@ include_attribute "drelephant"
 include_attribute "dela"
 include_attribute "hive2"
 include_attribute "hops"
+include_attribute "hops_airflow"
 
 default['hopsworks']['version']                  = node['install']['version']
 default['hopsworks']['current_version']          = node['install']['current_version']
@@ -245,6 +246,7 @@ default['jupyter']['base_dir']                         = node['install']['dir'].
 default['jupyter']['user']                             = node['install']['user'].empty? ? "jupyter" : node['install']['user']
 default['jupyter']['group']                            = node['install']['user'].empty? ? "jupyter" : node['install']['user']
 default['jupyter']['python']                           = "true"
+default['jupyter']['shutdown_timer_interval']          = "30m"
 
 #
 # TensorFlow Serving
@@ -346,3 +348,4 @@ default['hopsworks']['expat_dir']                    = "#{node['install']['dir']
 # Feature Store
 #
 default['hopsworks']['featurestore_default_storage_format']   = "ORC"
+

@@ -4,7 +4,7 @@ maintainer_email "jdowling@kth.se"
 license          "Apache v2.0"
 description      "Installs/Configures HopsWorks, the UI for Hops Hadoop."
 long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
-version          "0.9.0"
+version          "0.10.0"
 source_url       "https://github.com/hopshadoop/hopsworks-chef"
 
 
@@ -34,7 +34,7 @@ depends 'tensorflow'
 depends 'hopslog'
 depends 'hopsmonitor'
 depends 'hive2'
-
+depends 'hops_airflow'
 
 #link:Click <a target='_blank' href='https://%host%:4848'>here</a> to launch Glassfish in your browser (http)
 recipe  "hopsworks::install", "Installs Glassfish"
@@ -1454,6 +1454,10 @@ attribute "jupyter/group",
 
 attribute "jupyter/python",
           :description => "'true' (default) to enable the python interpreter, 'false' to disable it (more secure). ",
+          :type => 'string'
+
+attribute "jupyter/shutdown_timer_interval",
+          :description => "notebook cleaner interval for shutting down expired notebooks",
           :type => 'string'
 
 ##
