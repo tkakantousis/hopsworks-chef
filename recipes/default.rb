@@ -1081,6 +1081,12 @@ link "#{node['kagent']['certs_dir']}/cacerts.jks" do
   to "#{theDomain}/config/cacerts.jks"
 end
 
+link "#{node['kagent']['certs_dir']}/keystore.jks" do
+  owner node['glassfish']['user']
+  group node['glassfish']['group']
+  to "#{theDomain}/config/keystore.jks"
+end
+
 #
 # Need to synchronize conda enviornments for newly joined or rejoining nodes.
 #
