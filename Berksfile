@@ -5,7 +5,7 @@ metadata
 
 cookbook 'conda', github: "tkakantousis/conda-chef", branch: "HOPSWORKS-1493"
 cookbook 'kagent', github: "logicalclocks/kagent-chef", branch: "master"
-cookbook 'hops', github: "logicalclocks/hops-hadoop-chef", branch: "master"
+cookbook 'hops', github: "tkakantousis/hops-hadoop-chef", branch: "HOPSWORKS-1493"
 cookbook 'ndb', github: "logicalclocks/ndb-chef", branch: "master"
 cookbook 'hadoop_spark', github: "logicalclocks/spark-chef", branch: "master"
 cookbook 'flink', github: "tkakantousis/flink-chef", branch: "HOPSWORKS-1493"
