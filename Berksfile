@@ -16,7 +16,7 @@ cookbook 'tensorflow', github: "tkakantousis/tensorflow-chef", branch: "add_hops
 cookbook 'dela', github: "logicalclocks/dela-chef", branch: "master"
 cookbook 'kzookeeper', github: "logicalclocks/kzookeeper", branch: "master"
 cookbook 'kkafka', github: "logicalclocks/kafka-cookbook", branch: "master"
-cookbook 'elastic', github: "logicalclocks/elasticsearch-chef", branch: "master"
+cookbook 'elastic', github: "tkakantousis/elasticsearch-chef", branch: "add_hops_group"
 cookbook 'hopslog', github: "logicalclocks/hopslog-chef", branch: "master"
 cookbook 'hopsmonitor', github: "logicalclocks/hopsmonitor-chef", branch: "master"
 cookbook 'hops_airflow', github: "logicalclocks/airflow-chef", branch: "master"
