@@ -14,7 +14,7 @@ cookbook 'drelephant', github: "logicalclocks/dr-elephant-chef", branch: "master
 cookbook 'epipe', github: "logicalclocks/epipe-chef", branch: "master"
 cookbook 'tensorflow', github: "logicalclocks/tensorflow-chef", branch: "master"
 cookbook 'dela', github: "logicalclocks/dela-chef", branch: "master"
-cookbook 'kzookeeper', github: "logicalclocks/kzookeeper", branch: "master"
+cookbook 'kzookeeper', github: "tkakantousis/kzookeeper", branch: "wait_for_quorum"
 cookbook 'kkafka', github: "tkakantousis/kafka-cookbook", branch: "set_local_zk"
 cookbook 'elastic', github: "logicalclocks/elasticsearch-chef", branch: "master"
 cookbook 'hopslog', github: "logicalclocks/hopslog-chef", branch: "master"
